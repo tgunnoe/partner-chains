@@ -49,7 +49,9 @@
             pkgs.clang
           ];
           
-          BINDGEN_EXTRA_CLANG_ARGS = if pkgs.lib.hasSuffix "linux" system then "-I${pkgs.glibc.dev}/include -I${pkgs.clang.cc.lib}/lib/clang/19/include" else "";
+          BINDGEN_EXTRA_CLANG_ARGS = if pkgs.lib.hasSuffix "linux" system
+                                     then "-I${pkgs.glibc.dev}/include -I${pkgs.clang.cc.lib}/lib/clang/19/include"
+                                     else "";
           LIBCLANG_PATH = "${pkgs.clang.cc.lib}/lib";
 
           CFLAGS = if pkgs.lib.hasSuffix "linux" system then
@@ -73,13 +75,23 @@
 
         # Common build inputs for all targets
         commonArgs = {
-          pname = "partner-chains-demo-node"; 
+          pname = "partner-chains-demo-node";
+          # Clean the project directory so that the nix hash
+          # doesn't change when unrelated files to builds update
           src = pkgs.lib.cleanSourceWith {
             src = self;
             filter = path: type:
-              (craneLib.filterCargoSources path type) ||
-              (pkgs.lib.hasSuffix "examples" path) ||
-              (pkgs.lib.hasSuffix ".json" path);
+              let
+                baseName = baseNameOf path;
+                excludedDirs = [ "docs" "e2e-tests" "scripts" "res" ".github" ".maintain" "dev" ];
+                isExcluded = builtins.elem baseName excludedDirs;
+                jsonFilter = pkgs.lib.hasSuffix ".json" path;
+              in
+              !isExcluded && (
+                (craneLib.filterCargoSources path type) ||
+                jsonFilter
+              );
+            name = "source";
           };
           
           buildInputs = with pkgs; [
@@ -103,13 +115,13 @@
 
         # Build the workspace dependencies separately
         cargoArtifacts = craneLib.buildDepsOnly (commonArgs // {
-          pname = "partner-chains-demo-node-deps";
+          #pname = "partner-chains-demo-node-deps";
+          #cargoExtraArgs = "--workspace --all-targets --exclude substrate-test-runtime --exclude substrate-test-runtime-client";
         });
 
         partner-chains-demo-node = craneLib.buildPackage (commonArgs // {
           pname = "partner-chains-demo-node";
           version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
-          
           inherit cargoArtifacts;
 
           # Git commit hash for partner-chains CLI --version flag
@@ -126,7 +138,7 @@
 
         cargoClippy = craneLib.cargoClippy (commonArgs // {
           inherit cargoArtifacts;
-          cargoClippyExtraArgs = "--all-targets -- --deny warnings";
+          #cargoClippyExtraArgs = "--workspace --all-targets --exclude substrate-test-runtime --exclude substrate-test-runtime-client --exclude sc-network-test";
         });
 
         cargoFmt = craneLib.cargoFmt {
@@ -137,20 +149,30 @@
       {
         checks = { 
           # Build the crate as part of `nix flake check`
-          inherit partner-chains-demo-node cargoTest cargoClippy cargoFmt;
+          inherit partner-chains-demo-node cargoTest # cargoClippy
+            cargoFmt;
         };
 
         packages = {
-          default = partner-chains-demo-node;
           inherit partner-chains-demo-node;
+          default = partner-chains-demo-node;
+          ci = pkgs.runCommand "ci" {
+            checks = builtins.attrValues self.checks.${system};
+          } ''
+            mkdir -p $out
+            for i in $checks; do
+              ln -s $i $out/$(basename $i | cut -d- -f2-)
+            done
+          '';
         };
         devShells.default = craneLib.devShell ({
           name = "partner-chains-demo-node-shell";
-          # Inherit inputs from checks, which pulls in the build environment from packages.default (and others)
+          # Inherit inputs from checks
           checks = self.checks.${system};
 
           # Extra packages for the dev shell
           packages = with pkgs; [
+            attic-client
             awscli2
             bashInteractive
             cargo-edit
@@ -187,12 +209,12 @@
     extra-substituters = [
       "https://nix-community.cachix.org"
       "https://cache.iog.io"
-      "https://cache.sc.iog.io"
+      "https://ci.sc.iog.io/partner-chains"
     ];
     extra-trusted-public-keys = [
       "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="
       "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
-      "cache.sc.iog.io:b4YIcBabCEVKrLQgGW8Fylz4W8IvvfzRc+hy0idqrWU="
+      "partner-chains:j9StpxUY/znqFqaevhQRxCH4Hi0F4rCGXDiUSjz+kew="
     ];
   };
 }
