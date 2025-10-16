@@ -35,6 +35,10 @@ jobs:
           ATTIC_ENDPOINT: ${{ secrets.ATTIC_ENDPOINT }}
           ATTIC_CACHE: ${{ secrets.ATTIC_CACHE }}
         run: |
+          nix build .#ci --print-build-logs --max-jobs auto --json | jq -r '.[].outputs.out' | nix path-info -r --stdin | attic push --stdin "$ATTIC_CACHE" ./result-ci
+          # nix build .#ci --print-build-logs --max-jobs auto --out-link result-ci
+          # attic push "$ATTIC_CACHE" ./result-ci
+          # rm result-ci
           # nix-instantiate -E '(builtins.getFlake "path:${builtins.toString ./.}").packages."${builtins.currentSystem}".ci' --add-root temp-ci-drv --indirect | \
           # nix-store --stdin -q --references | \
           # nix-store --stdin --realise -v -j auto | \
@@ -42,11 +46,11 @@ jobs:
           # tr '\n' ' ' | \
           # xargs attic push "$ATTIC_CACHE"
           # rm temp-ci-drv
-          nix-instantiate -E '(builtins.getFlake "path:${builtins.toString ./.}").packages."${builtins.currentSystem}".ci' --add-root temp-ci-drv --indirect > top-drv.path
-          all_drvs=$(cat top-drv.path; cat top-drv.path | nix-store --stdin -q --references | nix-store --stdin -q --references | sort | uniq)
-          echo "$all_drvs" | nix-store --stdin --realise -v -j auto --add-root realized-drvs --indirect > realized-drvs.paths
-          cat realized-drvs.paths | nix-store --stdin -q --outputs | sort | uniq | nix-store --stdin -qR --include-outputs | tr '\n' ' ' | xargs attic push "$ATTIC_CACHE"
-          rm temp-ci-drv top-drv.path realized-drvs*
+          # nix-instantiate -E '(builtins.getFlake "path:${builtins.toString ./.}").packages."${builtins.currentSystem}".ci' --add-root temp-ci-drv --indirect > top-drv.path
+          # all_drvs=$(cat top-drv.path; cat top-drv.path | nix-store --stdin -q --references | nix-store --stdin -q --references | sort | uniq)
+          # echo "$all_drvs" | nix-store --stdin --realise -v -j auto --add-root realized-drvs --indirect > realized-drvs.paths
+          # cat realized-drvs.paths | nix-store --stdin -q --outputs | sort | uniq | nix-store --stdin -qR --include-outputs | tr '\n' ' ' | xargs attic push "$ATTIC_CACHE"
+          # rm temp-ci-drv top-drv.path realized-drvs*
       # - name: Push built outputs to Attic
       #   #if: github.ref == 'refs/heads/master'
       #   env:
