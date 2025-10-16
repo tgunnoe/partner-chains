@@ -145,30 +145,10 @@
           inherit (commonArgs) pname src;
         };
 
-      in
-      {
-        checks = { 
-          # Build the crate as part of `nix flake check`
-          inherit partner-chains-demo-node cargoTest # cargoClippy
-            cargoFmt;
-        };
-
-        packages = {
-          inherit partner-chains-demo-node;
-          default = partner-chains-demo-node;
-          ci = pkgs.runCommand "ci" {
-            checks = builtins.attrValues self.checks.${system};
-          } ''
-            mkdir -p $out
-            for i in $checks; do
-              ln -s $i $out/$(basename $i | cut -d- -f2-)
-            done
-          '';
-        };
-        devShells.default = craneLib.devShell ({
+        devShell = craneLib.devShell ({
           name = "partner-chains-demo-node-shell";
-          # Inherit inputs from checks
-          checks = self.checks.${system};
+          # Inherit inputs from other build artifacts (not self.checks to avoid recursion)
+          inputsFrom = [ partner-chains-demo-node ];
 
           # Extra packages for the dev shell
           packages = with pkgs; [
@@ -199,6 +179,28 @@
           else
             [pkgs.clang]);
         } // shellEnv);
+
+      in
+      {
+        checks = {
+          # Build the crate as part of `nix flake check'
+          inherit partner-chains-demo-node cargoTest cargoFmt devShell;
+        };
+
+        packages = {
+          inherit partner-chains-demo-node;
+          default = partner-chains-demo-node;
+          ci = pkgs.runCommand "ci" {
+            checks = builtins.attrValues self.checks.${system};
+          } ''
+            mkdir -p $out
+            for i in $checks; do
+              ln -s $i $out/$(basename $i | cut -d- -f2-)
+            done
+          '';
+        };
+
+        devShells.default = devShell;
 
         formatter = pkgs.nixfmt-rfc-style;
       });
