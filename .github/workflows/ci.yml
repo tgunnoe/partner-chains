@@ -32,7 +32,7 @@ jobs:
 
       - name: Build and check flake
         run: |
-          nix build .#ci \
+          nix build -L .#ci \
             --out-link result-ci
 
       - name: Push built outputs to Attic
