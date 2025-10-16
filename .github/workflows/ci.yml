@@ -35,7 +35,7 @@ jobs:
           ATTIC_ENDPOINT: ${{ secrets.ATTIC_ENDPOINT }}
           ATTIC_CACHE: ${{ secrets.ATTIC_CACHE }}
         run: |
-          nix build .#ci --print-build-logs --max-jobs auto --json | jq -r '.[].outputs.out' | nix path-info -r --stdin | attic push --stdin "$ATTIC_CACHE" ./result-ci
+          nix build .#ci --print-build-logs --max-jobs auto --json | jq -r '.[].outputs.out' | nix path-info -r --stdin | attic push --stdin "$ATTIC_CACHE"
           # nix build .#ci --print-build-logs --max-jobs auto --out-link result-ci
           # attic push "$ATTIC_CACHE" ./result-ci
           # rm result-ci
