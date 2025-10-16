@@ -125,7 +125,7 @@
           inherit cargoArtifacts;
 
           # Git commit hash for partner-chains CLI --version flag
-          SUBSTRATE_CLI_GIT_COMMIT_HASH = self.dirtyShortRev or self.shortRev;
+          SUBSTRATE_CLI_GIT_COMMIT_HASH = "dev";# self.dirtyShortRev or self.shortRev;
           
           postFixup = pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
             patchelf --set-rpath "${pkgs.rocksdb}/lib:${pkgs.stdenv.cc.cc.lib}/lib" $out/bin/partner-chains-demo-node

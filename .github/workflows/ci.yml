@@ -30,14 +30,21 @@ jobs:
           attic login --set-default admin "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
           attic use "$ATTIC_CACHE"
 
-      - name: Build and check flake
-        run: |
-          nix build -L .#ci \
-            --out-link result-ci
-
-      - name: Push built outputs to Attic
-        #if: github.ref == 'refs/heads/master'
+      - name: Build and cache flake outputs
         env:
           ATTIC_ENDPOINT: ${{ secrets.ATTIC_ENDPOINT }}
           ATTIC_CACHE: ${{ secrets.ATTIC_CACHE }}
-        run: nix path-info --recursive ./result-ci | attic push --stdin "$ATTIC_CACHE"
+        run: |
+          nix-instantiate -E '(builtins.getFlake "path:${builtins.toString ./.}").packages."${builtins.currentSystem}".ci' --add-root temp-ci-drv --indirect | \
+          nix-store --stdin -q --references | \
+          nix-store --stdin --realise -v -j auto | \
+          nix-store --stdin -qR --include-outputs | \
+          tr '\n' ' ' | \
+          xargs attic push "$ATTIC_CACHE"
+          rm temp-ci-drv
+      # - name: Push built outputs to Attic
+      #   #if: github.ref == 'refs/heads/master'
+      #   env:
+      #     ATTIC_ENDPOINT: ${{ secrets.ATTIC_ENDPOINT }}
+      #     ATTIC_CACHE: ${{ secrets.ATTIC_CACHE }}
+      #   run: nix path-info --recursive ./result-ci | attic push --stdin "$ATTIC_CACHE"
